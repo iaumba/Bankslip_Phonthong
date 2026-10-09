@@ -6,13 +6,13 @@ function myFunction() {
 // ==========================================
 // 1. CONFIGURATION (ส่วนตั้งค่าระบบ)
 // ==========================================
-const SPREADSHEET_ID = '1ettfZO56bQ_SvW66RgVgRjyf76DJGWKVa5qSXBfeglM';
+const SPREADSHEET_ID = '1B2FYoLxKPTim1rZOiLzTbXyJTA4tX2Qv4zI0JAZSmJM';
 
 // Secret อ่านจาก Script Properties (ดูวิธีตั้งค่าใน setConfig() ด้านล่าง)
 const LINE_CHANNEL_ACCESS_TOKEN = _getConfig('LINE_CHANNEL_ACCESS_TOKEN');
 const GEMINI_API_KEY = _getConfig('GEMINI_API_KEY');
 const PRICE_SHEET_NAME = 'PriceList';          // ชื่อแท็บเก็บราคาสินค้า
-const PRICE_FILE_ID = '1LgvW4Yly4zdVOUCZgROMSAP5uJtTP22RoI-4tTi5cwY'; // ไฟล์ Google export Product (ไว้เช็คเวลาแก้ไขล่าสุด)
+const PRICE_FILE_ID = '1B2FYoLxKPTim1rZOiLzTbXyJTA4tX2Qv4zI0JAZSmJM'; // ไฟล์ Google export Product (ไว้เช็คเวลาแก้ไขล่าสุด)
 
 // model ตัวแรก = ตัวหลัก, ตัวหลัง = ตัวสำรองเมื่อตัวหลักโดน 503 (demand สูง)
 const GEMINI_MODELS_IMAGE = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
@@ -56,6 +56,40 @@ function verifyConfig() {
   return missing.length === 0
     ? 'OK: Config ครบถ้วน'
     : 'MISSING: ' + missing.join(', ');
+}
+
+// ==========================================
+// SETUP — สร้างไฟล์สรุปสลิปใหม่ในโฟลเดอร์ Drive + คัดลอก PriceList จากไฟล์เดิม
+// รันครั้งเดียว (ผ่าน clasp run) แล้วนำ spreadsheetId ที่คืนกลับไปอัปเดต
+// SPREADSHEET_ID และ PRICE_FILE_ID ใน Code.gs
+// ==========================================
+function createRecordSpreadsheet() {
+  const folderId = '1TkNqB6wW5GWmeV4f5rTQuJFcmDcGfLba';
+  const fileName = 'สรุปสลิปธนาคารโพนทอง';
+
+  const newSs = SpreadsheetApp.create(fileName);
+  const newId = newSs.getId();
+  DriveApp.getFileById(newId).moveTo(DriveApp.getFolderById(folderId));
+
+  const mainSheet = newSs.getSheets()[0];
+  mainSheet.setName('โอนเงิน');
+  mainSheet.appendRow(['เวลาบันทึก', 'กลุ่ม LINE', 'จำนวนเงิน', 'ผู้รับ', 'ธนาคารผู้รับ', 'ผู้ชำระ', 'ธนาคารผู้ชำระ', 'เลขอ้างอิง', 'วันที่', 'LINE ID']);
+
+  const oldPrice = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PRICE_SHEET_NAME);
+  if (oldPrice) {
+    const data = oldPrice.getDataRange().getValues();
+    if (data.length > 0) {
+      const priceSheet = newSs.insertSheet(PRICE_SHEET_NAME);
+      priceSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    }
+  }
+
+  return {
+    spreadsheetId: newId,
+    url: newSs.getUrl(),
+    sheetName: mainSheet.getSheetName(),
+    note: 'อัปเดต SPREADSHEET_ID และ PRICE_FILE_ID ใน Code.gs เป็น spreadsheetId นี้'
+  };
 }
 
 function getSpreadsheet() {
@@ -129,6 +163,12 @@ function getWebhookBody(e) {
 
 function okResponse() {
   return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+                       .setMimeType(ContentService.MimeType.JSON);
+}
+
+// HEALTH: ตรวจว่า deployment ตอบสนอง (ข้อมูลไม่ไวต่อความปลอดภัย)
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'SupplierPaymentBot' }))
                        .setMimeType(ContentService.MimeType.JSON);
 }
 
