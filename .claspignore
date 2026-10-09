@@ -1,0 +1,8 @@
+**/.git/**
+**/.gitignore
+**/.clasp.json
+**/.claspignore
+**/config.local.json
+**/config.example.json
+**/node_modules/**
+**/*.log
