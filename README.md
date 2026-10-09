@@ -74,7 +74,7 @@ doPost()  ── lock + dedup กัน event ซ้ำ
 ## สิ่งที่ต้องเตรียม
 
 1. **LINE Developers** — Messaging API channel (มี Channel access token + Webhook URL)
-2. **Gemini API key** — จาก Google AI Studio (Model 수: `gemini-3.5-flash-lite`)
+2. **Gemini API key** — จาก Google AI Studio (Model: `gemini-3.5-flash-lite`)
 3. **Google Account (iaumba@gmail.com)** — ถือ LINE bot / Sheets / Drive Folder
 4. **เครื่องมือบน PC:**
    - Git (`git --version`)
@@ -171,7 +171,7 @@ https://script.google.com/home/usersettings → เปิด "Apps Script API"
 
 > หมายเหตุ: `clasp run` บนโปรเจ็กต์ที่ใช้ GCP project เริ่มต้นอาจ error
 > `NOT_FOUND ... while reading from storage` (เป็น bug ฝั่ง Google)
-> ถ้าเจอให้ใช้วิธี B หรือวิธีผ่าน web app URL (กรณีครั้งแรก) แทน
+> ถ้าเจอให้ใช้วิธี B (Script Editor) แทน
 
 ## การ Deploy Web App และผูก LINE
 
@@ -220,8 +220,8 @@ git push                                      # ถ้ามี remote
 
 **ไฟล์สรุปสลิป (สร้างครั้งแรก):** ถ้าต้องสร้างสเปรดชีตใหม่ในโฟลเดอร์ + คัดลอก PriceList
 ให้รัน `createRecordSpreadsheet()` แล้วนำ `spreadsheetId` กลับไปอัปเดต
-`SPREADSHEET_ID` และ `PRICE_FILE_ID` ใน `Code.gs` (ไฟล์นี้สร้างความย่อง
-แพ้ชี้นี้ไว้แล้ว: `1B2FYoLxKPTim1rZOiLzTbXyJTA4tX2Qv4zI0JAZSmJM`)
+`SPREADSHEET_ID` และ `PRICE_FILE_ID` ใน `Code.gs`
+(ตอนนี้ชี้อยู่ที่ `1B2FYoLxKPTim1rZOiLzTbXyJTA4tX2Qv4zI0JAZSmJM` แล้ว)
 
 ## การแก้ปัญหา (Troubleshooting)
 
@@ -229,13 +229,13 @@ git push                                      # ถ้ามี remote
 |---|---|
 | Authorize หลุดทุก 7 วัน | โปรเจ็กต์ถูกผูก GCP project ที่ consent screen เป็น Testing → ใช้ GCP เริ่มต้น (ไม่ผูก) เหมือนตัวนี้ และไม่เกิดซ้ำ |
 | `clasp run` error `NOT_FOUND ... reading from storage` | bug ของ Apps Script API บน GCP เริ่มต้น → ใช้ตั้ง config ผ่าน Script Editor หรือ URL แทน |
-| `clasp push` แสดง "Skipping push." | clasp เช็ค hash ซึม → ใช้ `clasp push -f` |
+| `clasp push` แสดง "Skipping push." | clasp เทียบ hash แล้วคิดว่าไม่มีอะไรเปลี่ยน → ใช้ `clasp push -f` |
 | `clasp create` แล้ว webapp 404 | `clasp create` เขียนทับ manifest → ตรวจ `appsscript.json` ว่ายังมีบล็อก `webapp` อยู่ แล้ว `push -f` อีกครั้ง |
 | LINE Verify "302 Found" | redirect ของ Google normal (echo) → LINE จริงตามได้ ข้ามได้ |
 | Deployment 404 ทั้ง GET/POST | deployment ไม่ได้ผ่าน authorize → deploy ผ่าน UI หรือเปิด URL ใน browser ของ owner รอบแรก |
 | Gemini 503 (demand สูง) | โค้ดมี fallback model + retry อัตโนมัติ 3 รอบ |
 | Push quota LINE หมด (429) | ฟรี 500/เดือน → ระบบใช้ reply ก่อน push แค่ fallback |
-| รูปสลิปถูก LINE ลบ (`使用できないアドレス`) | ประมวลผลช้า → ดาวน์โหลดรูปโดยเร็วที่สุด, อ่านล้มเหลวถูกบันทึกแถว `อ่านล้มเหลว` |
+| อ่านสลิปไม่ได้ (รูปถูกลบ/หมดอายุ) | ต้องดาวน์โหลดรูปจาก LINE ให้เร็วที่สุด — ถ้าล้มเหลวจะบันทึกแถว `อ่านล้มเหลว` + เหตุผลลง Sheet แทน |
 
 ## Git กับ Version Control
 
