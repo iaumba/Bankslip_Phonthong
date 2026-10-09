@@ -1,4 +1,4 @@
-# SupplierPayment Bot (บอทสลิปโอนเงิน + เช็คราคา)
+# Bankslip_Phonthong (บอทสลิปโอนเงิน + เช็คราคา)
 
 บอท LINE Messaging API + Google Apps Script + Gemini API
 รับภาพสลิป/ข้อความรายงานรับเงินสด-โอนเงิน → แยกข้อมูลด้วย Gemini → บันทึกลง Google Sheets พร้อมส่งสรุป Flex Message กลับใน LINE และรองรับคำสั่งค้นหาราคาสินค้า `#ราคา`
@@ -20,6 +20,7 @@
 
 | รายการ | ค่า |
 |---|---|
+| ชื่อโครงการ (บน script.google.com) | `Bankslip_Phonthong` |
 | Apps Script ID | `17Zpx8Xai5-QOCW9jPoSsSX_W60OBjw5iEas4ivSVL3asb7XgP_Txyqcm` |
 | Webhook URL (Production) | `https://script.google.com/macros/s/AKfycbxleafYWEUIFQLbYqoR_1y0asrzA1mnvYSU9iUlpCJ1DWGnkh1PHtZIsiavjBvQil0O/exec` |
 | ไฟล์สรุปสลิป (Spreadsheet ID) | `1B2FYoLxKPTim1rZOiLzTbXyJTA4tX2Qv4zI0JAZSmJM` |
@@ -30,6 +31,22 @@
 > ⚠️ **จุดสำคัญ:** โปรเจ็กต์นี้ **ไม่ได้ผูก (link) กับ GCP project ส่วนตัว**
 > จึงใช้ GCP project เริ่มต้นของ Google → หลีกเลี่ยงปัญหา **"Authorize หลุดทุก 7 วัน"**
 > ที่เกิดจาก OAuth consent screen ในสถานะ Testing ของ GCP project ที่ผูกเอง
+
+### เปิดโปรเจ็กต์หลัก (แก้โค้ดบอท)
+
+เปิด editor ตรง ๆ (หนังสือของโปรเจ็กต์ ไม่ใช่จากในชีต):
+
+```
+https://script.google.com/d/17Zpx8Xai5-QOCW9jPoSsSX_W60OBjw5iEas4ivSVL3asb7XgP_Txyqcm/edit
+```
+
+หรือเข้า `https://script.google.com/home` → โปรเจ็กต์ **Bankslip_Phonthong**
+
+> **หมายเหตุเรื่อง "Script editor" ในไฟล์ชีตข้อมูล:**
+> ไฟล์สรุปสลิป (`1B2FYoLx...`) เป็นสเปรดชีต **standalone** ที่บอทสร้างขึ้น
+> จึง**ไม่ได้ผูกกับโค้ดบอท** — ถ้ากด *Script editor* จากในชีตจะเปิด container script เปล่า ๆ
+> ตัวหนึ่ง (เช่น `1TsKoVmVwndff...`) ที่ Google สร้างให้เอง เป็นแค่ตัวเชื่อมว่าง ไม่ใช่ตัวบอท
+> ตัวบอทแก้ที่ URL ด้านบนเท่านั้น
 
 ## โครงสร้างโปรเจ็กต์
 
@@ -119,7 +136,7 @@ https://script.google.com/home/usersettings → เปิด "Apps Script API"
 ### 4) สร้างโปรเจ็กต์ Script
 
 ```powershell
-& $clasp create --type standalone --title "SupplierPayment Bot"
+& $clasp create --type standalone --title "Bankslip_Phonthong"
 ```
 
 > ⚠️ `clasp create` จะโคลน `appsscript.json` เปล่าของ Google มาทับของเรา
