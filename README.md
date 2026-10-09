@@ -51,7 +51,7 @@ https://script.google.com/d/17Zpx8Xai5-QOCW9jPoSsSX_W60OBjw5iEas4ivSVL3asb7XgP_T
 ## โครงสร้างโปรเจ็กต์
 
 ```
-supplier-payment-bot/
+Bankslip_Phonthong/
 ├── Code.gs              # โค้ดหลักทั้งหมด (webhook + Gemini + Sheets + LINE)
 ├── appsscript.json      # manifest (timeZone Asia/Bangkok, webapp: Execute as Me / Anyone)
 ├── config.example.json  # ตัวอย่างคีย์ config (ไม่มีความลับ)
@@ -105,8 +105,8 @@ doPost()  ── lock + dedup กัน event ซ้ำ
 ### 1) สร้าง/โคลนโปรเจ็กต์
 
 ```powershell
-mkdir C:\bankslip\supplier-payment-bot
-cd C:\bankslip\supplier-payment-bot
+mkdir C:\bankslip\Bankslip_Phonthong
+cd C:\bankslip\Bankslip_Phonthong
 ```
 
 ### 2) ล็อกอิน clasp (ครั้งแรกของเครื่อง)
@@ -256,7 +256,7 @@ git push                                      # ถ้ามี remote
 
 ## Git กับ Version Control
 
-โปรเจ็กต์ใช้ Git ในโฟลเดอร์ `supplier-payment-bot` หลักการ:
+โปรเจ็กต์ใช้ Git ในโฟลเดอร์ `Bankslip_Phonthong` หลักการ:
 
 - **Commit สิ่งที่ควร commit:** `Code.gs`, `appsscript.json`, `config.example.json`,
   `.gitignore`, `.claspignore`, เอกสาร
