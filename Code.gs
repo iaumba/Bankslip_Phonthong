@@ -30,6 +30,8 @@ const ALLOWED_RECEIVERS = [
 // Cache ระดับ execution (ใช้ซ้ำในรอบเดียว ไม่ต้อง openById ซ้ำ ๆ)
 let _spreadsheetInstance = null;
 let _priceSheetInstance  = null;
+let _tzEnsured = false; // ตั้ง timezone ของไฟล์ชีตเป็น BKK รอบแรกเท่านั้น
+let _dateColEnsured = false; // ตั้งคอลัมน์ 'วันที่' เป็น text รอบแรกเท่านั้น (กันชีตแปลงเป็น Date)
 
 function _getConfig(key) {
   return PropertiesService.getScriptProperties().getProperty(key) || '';
@@ -68,6 +70,7 @@ function createRecordSpreadsheet() {
   const fileName = 'สรุปสลิปธนาคารโพนทอง';
 
   const newSs = SpreadsheetApp.create(fileName);
+  newSs.setSpreadsheetTimeZone('Asia/Bangkok');
   const newId = newSs.getId();
   DriveApp.getFileById(newId).moveTo(DriveApp.getFolderById(folderId));
 
@@ -95,6 +98,12 @@ function createRecordSpreadsheet() {
 function getSpreadsheet() {
   if (!_spreadsheetInstance) {
     _spreadsheetInstance = SpreadsheetApp.openById(SPREADSHEET_ID);
+    if (!_tzEnsured) {
+      _tzEnsured = true;
+      if (_spreadsheetInstance.getSpreadsheetTimeZone() !== 'Asia/Bangkok') {
+        _spreadsheetInstance.setSpreadsheetTimeZone('Asia/Bangkok');
+      }
+    }
   }
   return _spreadsheetInstance;
 }
@@ -110,11 +119,17 @@ function getPriceSheet() {
 // ผูกแท็บสำหรับบันทึก: ใช้ชื่อจาก MAIN_SHEET_NAME ถ้ากำหนดไว้ ไม่ได้ผูกกับแท็บที่ active อยู่
 function getMainSheet() {
   const sheetName = _getConfig('MAIN_SHEET_NAME');
+  let sheet;
   if (sheetName) {
     const named = getSpreadsheet().getSheetByName(sheetName);
-    if (named) return named;
+    if (named) sheet = named;
   }
-  return getSpreadsheet().getSheets()[0];
+  if (!sheet) sheet = getSpreadsheet().getSheets()[0];
+  if (!_dateColEnsured) {
+    _dateColEnsured = true;
+    sheet.getRange('I2:I').setNumberFormat('@'); // คอลัมน์ 'วันที่' บังคับ text กันชีตแปลงเป็น Date
+  }
+  return sheet;
 }
 
 // ==========================================
@@ -580,10 +595,74 @@ function extractPaymentDetails(apiResponse) {
 function saveToSpreadsheet(details) {
   const sheet = getMainSheet(); // ผูกแท็บแรกเสมอ ไม่ขึ้นกับแท็บที่ active อยู่
   console.log('saveToSpreadsheet -> sheet name: [' + sheet.getSheetName() + '] amount: ' + details.amount + ' receiver: ' + details.receiverName);
+  // เงินสด: วันที่ = วันนี้ (BKK, ไม่มีเวลา) ให้ตรงกับ reply message
+  let dateVal = details.date;
+  if (/รับสด|เงินสด/.test(details.receiverName + '|' + details.receiverBank)) {
+    dateVal = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy');
+  }
   sheet.appendRow([
-    new Date().toLocaleString('th-TH'), details.lineGroup, details.amount, details.receiverName,
-    details.receiverBank, details.senderName, details.senderBank, details.referenceNo, details.date, details.userId
+    new Date(), details.lineGroup, details.amount, details.receiverName,
+    details.receiverBank, details.senderName, details.senderBank, details.referenceNo, dateVal, details.userId
   ]);
+}
+
+// ==========================================
+// REPAIR — แปลงแถวเก่าที่คอลัมน์ A เขียนด้วย toLocaleString (เวลา US) ให้เป็นเวลา BKK
+// ใช้เวลาเขียนเดิมจาก SRC_RECORD_TIMEZONE (เซิร์ฟเวอร์ Apps Script) -> ถูกต้องเสมอ
+// ถ้าเวลาที่แปลงออกมาไม่ตรง ให้เปลี่ยน SRC_RECORD_TIMEZONE (เช่น 'America/New_York')
+// ==========================================
+const SRC_RECORD_TIMEZONE = 'America/Los_Angeles';
+
+// แปลงค่าเวลา local (naive) ที่เขียนจากโซน src เป็น Date จริงในโซนนั้น
+function naiveSrcToDate_(d, mo, y, hh, mm, ss) {
+  const utc = new Date(Date.UTC(y, mo - 1, d, hh, mm, ss || 0));
+  const s = Utilities.formatDate(utc, SRC_RECORD_TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+  const p = s.split(/[- :]/).map(Number);
+  const srcLocalEpoch = Date.UTC(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
+  const offsetMs = srcLocalEpoch - utc.getTime();
+  return new Date(utc.getTime() - offsetMs);
+}
+
+// รัน 1 ครั้ง: อ่านคอลัมน์ A แถว 2..ล่าสุด แปลงข้อความเวลา US -> เขียนค่า Date (แสดง BKK)
+function repairTimestampColumn() {
+  const sheet = getMainSheet();
+  const last = sheet.getLastRow();
+  if (last < 2) return 'ไม่มีแถวข้อมูลในคอลัมน์ A';
+  const vals = sheet.getRange('A2:A' + last).getValues();
+  let fixed = 0;
+  let skipped = 0;
+  for (let i = 0; i < vals.length; i++) {
+    const row = i + 2;
+    const v = vals[i][0];
+    if (v instanceof Date) { skipped++; continue; } // เป็นเวลาแล้ว ไม่แตะ
+    const s = String(v).trim();
+    const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})[, ]+(\d{1,2}):(\d{2}):(\d{2})$/);
+    if (!m) { skipped++; continue; } // parse ไม่ได้ ข้าม (log ด้านล่าง)
+    let y = Number(m[3]);
+    if (y > 2500) y -= 543; // ปี พ.ศ. -> ค.ศ.
+    const dt = naiveSrcToDate_(Number(m[1]), Number(m[2]), y, Number(m[4]), Number(m[5]), Number(m[6]));
+    sheet.getRange('A' + row).setValue(dt);
+    fixed++;
+    console.log('FIX A' + row + ': "' + s + '" -> ' + Utilities.formatDate(dt, 'Asia/Bangkok', 'dd/MM/yyyy HH:mm:ss'));
+  }
+  return 'เสร็จ: แปลง ' + fixed + ' แถว, ข้าม ' + skipped + ' แถว (ดู log ตรวจผลด้วย)';
+}
+
+// วินิจฉัย: ดูค่าดิบ (type + ข้อมูลจริง) ของคอลัมน์ A และ I — ไม่แก้ข้อมูลใดๆ
+function debugTimeCells() {
+  const sheet = getMainSheet();
+  console.log('sheet=' + sheet.getSheetName() + ' lastRow=' + sheet.getLastRow());
+  const last = Math.min(sheet.getLastRow(), 8);
+  const vals = sheet.getRange('A2:I' + last).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    const a = vals[i][0];
+    const colI = vals[i][8];
+    console.log(
+      'R' + (i + 2) +
+      ' | A: type=' + typeof a + ' isDate=' + (a instanceof Date) + ' raw=' + JSON.stringify(a) +
+      ' | I: type=' + typeof colI + ' isDate=' + (colI instanceof Date) + ' raw=' + JSON.stringify(colI)
+    );
+  }
 }
 
 // ==========================================
