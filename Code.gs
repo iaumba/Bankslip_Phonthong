@@ -71,7 +71,7 @@ function createRecordSpreadsheet() {
 
   const mainSheet = newSs.getSheets()[0];
   mainSheet.setName('โอนเงิน');
-  mainSheet.appendRow(['เวลาบันทึก', 'กลุ่ม LINE', 'จำนวนเงิน', 'ผู้รับ', 'ธนาคารผู้รับ', 'ผู้ชำระ', 'ธนาคารผู้ชำระ', 'เลขอ้างอิง', 'วันที่', 'LINE ID']);
+  mainSheet.appendRow(['เวลาบันทึก', 'กลุ่ม LINE', 'จำนวนเงิน', 'ผู้รับ', 'ธนาคารผู้รับ', 'ผู้ชำระ', 'ธนาคารผู้ชำระ', 'เลขอ้างอิง', 'วันที่', 'Chat ID']);
 
   const oldPrice = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PRICE_SHEET_NAME);
   if (oldPrice) {
@@ -123,6 +123,9 @@ function getMainSheet() {
   if (!_dateColEnsured) {
     _dateColEnsured = true;
     sheet.getRange('I2:I').setNumberFormat('@'); // คอลัมน์ 'วันที่' บังคับ text กันชีตแปลงเป็น Date
+    if (sheet.getRange('J1').getValue() === 'LINE ID') {
+      sheet.getRange('J1').setValue('Chat ID'); // อัปเดตหัวคอลัมน์จาก LINE ID เป็น Chat ID
+    }
   }
   return sheet;
 }
@@ -276,7 +279,7 @@ function handleImageMessage(event) {
         ...paymentDetails,
         receiverName: `รอตรวจสอบบัญชี (${receiverName})`,
         lineGroup: lineGroupName,
-        userId: event.source.userId
+        userId: getSourceChatId_(event)
       });
 
       // ส่ง Flex Message โทนสีส้มแบบซอฟต์ นุ่มนวล เพื่อให้ช่วยเช็กสลิปผิดใบ
@@ -295,7 +298,7 @@ function handleImageMessage(event) {
     saveToSpreadsheet({
       ...paymentDetails,
       lineGroup: lineGroupName,
-      userId: event.source.userId
+      userId: getSourceChatId_(event)
     });
 
     replyToUser(event, {
@@ -362,7 +365,7 @@ function handleMixedPaymentMessage(event, userText) {
 
     const baseDetails = {
       lineGroup: lineGroupName, referenceNo: "-", date: formattedCurrentDate,
-      userId: event.source.userId, senderName: "คนจัดส่ง", senderBank: "เงินสด", receiverBank: "เงินสด"
+      userId: getSourceChatId_(event), senderName: "คนจัดส่ง", senderBank: "เงินสด", receiverBank: "เงินสด"
     };
 
     let hasRecorded = false;
@@ -578,6 +581,14 @@ function extractPaymentDetails(apiResponse) {
     console.error('Error in extractPaymentDetails: ' + e.toString());
     return null;
   }
+}
+
+// คืน Chat ID สำหรับเก็บในคอลัมน์ J: กลุ่ม -> groupId, Room -> roomId, แชตส่วนตัว -> userId
+function getSourceChatId_(event) {
+  const src = (event && event.source) || {};
+  if (src.type === 'group') return src.groupId || '';
+  if (src.type === 'room') return src.roomId || '';
+  return src.userId || '';
 }
 
 function saveToSpreadsheet(details) {
