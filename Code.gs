@@ -1,8 +1,3 @@
-function myFunction() {
-
-}
-
-
 // ==========================================
 // 1. CONFIGURATION (ส่วนตั้งค่าระบบ)
 // ==========================================
@@ -185,13 +180,6 @@ function okResponse() {
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'SupplierPaymentBot' }))
                        .setMimeType(ContentService.MimeType.JSON);
-}
-
-// ใช้ตรวจสอบว่าโค้ดกำลังบันทึกไปแท็บไหน (รันใน Script Editor แล้วดู Execution log)
-function testWriteRow() {
-  const sheet = getMainSheet();
-  console.log('testWriteRow -> will write to sheet: [' + sheet.getSheetName() + '] (index 0)');
-  console.log('รายละเอียดฟังก์ชัน getMainSheet() กำลังชี้ไปที่: ' + sheet.getSheetName());
 }
 
 function processEvent(event) {
@@ -604,65 +592,6 @@ function saveToSpreadsheet(details) {
     new Date(), details.lineGroup, details.amount, details.receiverName,
     details.receiverBank, details.senderName, details.senderBank, details.referenceNo, dateVal, details.userId
   ]);
-}
-
-// ==========================================
-// REPAIR — แปลงแถวเก่าที่คอลัมน์ A เขียนด้วย toLocaleString (เวลา US) ให้เป็นเวลา BKK
-// ใช้เวลาเขียนเดิมจาก SRC_RECORD_TIMEZONE (เซิร์ฟเวอร์ Apps Script) -> ถูกต้องเสมอ
-// ถ้าเวลาที่แปลงออกมาไม่ตรง ให้เปลี่ยน SRC_RECORD_TIMEZONE (เช่น 'America/New_York')
-// ==========================================
-const SRC_RECORD_TIMEZONE = 'America/Los_Angeles';
-
-// แปลงค่าเวลา local (naive) ที่เขียนจากโซน src เป็น Date จริงในโซนนั้น
-function naiveSrcToDate_(d, mo, y, hh, mm, ss) {
-  const utc = new Date(Date.UTC(y, mo - 1, d, hh, mm, ss || 0));
-  const s = Utilities.formatDate(utc, SRC_RECORD_TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
-  const p = s.split(/[- :]/).map(Number);
-  const srcLocalEpoch = Date.UTC(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
-  const offsetMs = srcLocalEpoch - utc.getTime();
-  return new Date(utc.getTime() - offsetMs);
-}
-
-// รัน 1 ครั้ง: อ่านคอลัมน์ A แถว 2..ล่าสุด แปลงข้อความเวลา US -> เขียนค่า Date (แสดง BKK)
-function repairTimestampColumn() {
-  const sheet = getMainSheet();
-  const last = sheet.getLastRow();
-  if (last < 2) return 'ไม่มีแถวข้อมูลในคอลัมน์ A';
-  const vals = sheet.getRange('A2:A' + last).getValues();
-  let fixed = 0;
-  let skipped = 0;
-  for (let i = 0; i < vals.length; i++) {
-    const row = i + 2;
-    const v = vals[i][0];
-    if (v instanceof Date) { skipped++; continue; } // เป็นเวลาแล้ว ไม่แตะ
-    const s = String(v).trim();
-    const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})[, ]+(\d{1,2}):(\d{2}):(\d{2})$/);
-    if (!m) { skipped++; continue; } // parse ไม่ได้ ข้าม (log ด้านล่าง)
-    let y = Number(m[3]);
-    if (y > 2500) y -= 543; // ปี พ.ศ. -> ค.ศ.
-    const dt = naiveSrcToDate_(Number(m[1]), Number(m[2]), y, Number(m[4]), Number(m[5]), Number(m[6]));
-    sheet.getRange('A' + row).setValue(dt);
-    fixed++;
-    console.log('FIX A' + row + ': "' + s + '" -> ' + Utilities.formatDate(dt, 'Asia/Bangkok', 'dd/MM/yyyy HH:mm:ss'));
-  }
-  return 'เสร็จ: แปลง ' + fixed + ' แถว, ข้าม ' + skipped + ' แถว (ดู log ตรวจผลด้วย)';
-}
-
-// วินิจฉัย: ดูค่าดิบ (type + ข้อมูลจริง) ของคอลัมน์ A และ I — ไม่แก้ข้อมูลใดๆ
-function debugTimeCells() {
-  const sheet = getMainSheet();
-  console.log('sheet=' + sheet.getSheetName() + ' lastRow=' + sheet.getLastRow());
-  const last = Math.min(sheet.getLastRow(), 8);
-  const vals = sheet.getRange('A2:I' + last).getValues();
-  for (let i = 0; i < vals.length; i++) {
-    const a = vals[i][0];
-    const colI = vals[i][8];
-    console.log(
-      'R' + (i + 2) +
-      ' | A: type=' + typeof a + ' isDate=' + (a instanceof Date) + ' raw=' + JSON.stringify(a) +
-      ' | I: type=' + typeof colI + ' isDate=' + (colI instanceof Date) + ' raw=' + JSON.stringify(colI)
-    );
-  }
 }
 
 // ==========================================
